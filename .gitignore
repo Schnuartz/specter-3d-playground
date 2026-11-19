@@ -1,0 +1,10 @@
+node_modules/
+_ref/
+_firmware/
+tests/
+*.log
+__pycache__/
+*.blend
+*.mp4
+assets/models/specter_case.glb
+assets/models/specter_button.glb

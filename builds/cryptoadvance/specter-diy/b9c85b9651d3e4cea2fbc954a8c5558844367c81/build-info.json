@@ -1,0 +1,35 @@
+{
+  "repository": "cryptoadvance/specter-diy",
+  "source_url": "https://github.com/cryptoadvance/specter-diy",
+  "commit": "b9c85b9651d3e4cea2fbc954a8c5558844367c81",
+  "branch": null,
+  "build_type": "Browser / WebAssembly",
+  "capabilities": {
+    "smartcard": true,
+    "smartcard_type": "MemoryCard"
+  },
+  "toolchain": "Emscripten 3.1.74",
+  "artifact_set_sha256": "0aa7130f94251a0f303a884992765b901247cf3ba2c1e6b593ed8b6bc67fdab5",
+  "built_at": "2026-10-02T11:43:33.630927+00:00",
+  "artifacts": {
+    "micropython.js": {
+      "bytes": 431368,
+      "sha256": "eedf58cf2b5e177fbace6046b41e29ed63f6bce08564c3a5aee7e34dbdd1c6e1"
+    },
+    "micropython.wasm": {
+      "bytes": 5782747,
+      "sha256": "1e5ba67b425c801465cd5ccf09d45ef5a60aaf16051dbaf00c85feac59e6511c"
+    },
+    "micropython.data": {
+      "bytes": 28391,
+      "sha256": "25792e1114bde82a36673195583d3ea018b5815a50fd88d9ddb156a51716d1a1"
+    }
+  },
+  "firmware_version": "1.10.5",
+  "wasm_optimization": {
+    "passes": [
+      "coalesce-locals",
+      "vacuum"
+    ]
+  }
+}

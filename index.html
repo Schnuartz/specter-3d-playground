@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: ws://127.0.0.1:8788 ws://localhost:8788 http://127.0.0.1:8788 http://localhost:8788; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Specter DIY — 3D Lab</title>
+  <meta name="description" content="Der echte Specter-DIY-Firmware-Stack als interaktive 3D-Workbench. Test-Gerät, keine echte Hardware-Wallet.">
+  <link rel="icon" href="assets/specter-logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="scene" aria-label="Interaktive 3D-Szene mit Specter DIY"></canvas>
+    <div id="vignette"></div>
+    <div id="grain"></div>
+  </div>
+
+  <header id="topbar">
+    <div class="brand">
+      <img src="assets/specter-logo.png" alt="Specter">
+      <span class="brand-sep">/</span>
+      <div class="brand-title">
+        <strong>DIY 3D LAB</strong>
+        <small>air-gapped hardware simulator</small>
+      </div>
+    </div>
+    <div class="chips" role="status" aria-live="polite">
+      <span class="chip" id="chip-power" data-state="off"><i class="dot"></i><span>POWER</span><b>OFF</b></span>
+      <span class="chip" id="chip-sd" data-state="out"><i class="dot"></i><span>microSD</span><b>—</b></span>
+      <span class="chip" id="chip-card" data-state="out"><i class="dot"></i><span>SMARTCARD</span><b>—</b></span>
+      <span class="chip" id="chip-scan" data-state="idle"><i class="dot"></i><span>SCANNER</span><b>IDLE</b></span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-sound" title="Sound an/aus" aria-label="Sound">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M19 6a9 9 0 0 1 0 12"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-help" title="Hilfe" aria-label="Hilfe">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-.9.6-1.5 1.2-1.5 2.5"/><path d="M12 17.2v.1"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-full" title="Vollbild" aria-label="Vollbild">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="scene-label">
+    <span id="scene-title">HAND-HOLD</span>
+    <span id="scene-sub">drag the device to inspect it · click the screen to use Specter</span>
+  </div>
+
+  <div id="hints">
+    <div class="hint-row"><kbd>drag</kbd><span>Gerät drehen</span></div>
+    <div class="hint-row"><kbd>tap</kbd><span>Touchscreen</span></div>
+    <div class="hint-row"><kbd>scroll</kbd><span>Zoom</span></div>
+    <div class="hint-row"><kbd>space</kbd><span>Power</span></div>
+  </div>
+
+  <nav id="dock" aria-label="Modi">
+    <button class="dock-btn active" data-mode="hand" title="Gerät in der Hand">
+      <svg viewBox="0 0 24 24"><path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V12m0-1.5a1.5 1.5 0 0 1 3 0V13m0-1a1.5 1.5 0 0 1 3 0v5.5a5 5 0 0 1-5 5h-1.7a5 5 0 0 1-4-2l-3.3-4.4a1.6 1.6 0 0 1 2.5-2L8 14"/></svg>
+      <span>Hand</span>
+    </button>
+    <button class="dock-btn" data-mode="desk" title="Gerät auf dem Tisch">
+      <svg viewBox="0 0 24 24"><path d="M3 18h18M5 18V9h14v9M9 9V6h6v3"/><path d="M8 13h8"/></svg>
+      <span>Desk</span>
+    </button>
+    <button class="dock-btn" id="dock-scan" data-mode="scan" title="Scanner-Ansicht" disabled>
+      <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>
+      <span>Scan</span>
+    </button>
+    <button class="dock-btn" id="dock-airgap" title="Specter Desktop">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20M9 16h6"/></svg>
+      <span>Desktop</span>
+    </button>
+    <button class="dock-btn" id="dock-keeper" title="Bitcoin Keeper">
+      <svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+      <span>Keeper</span>
+    </button>
+    <button class="dock-btn" id="dock-workbench" title="Workbench öffnen">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg>
+      <span>Workbench</span>
+    </button>
+  </nav>
+
+  <aside id="workbench" class="panel" aria-hidden="true">
+    <div class="panel-head">
+      <div>
+        <strong>Workbench</strong>
+        <small>simulierte Peripherie & Firmware</small>
+      </div>
+      <button class="close-btn" id="wb-close" aria-label="Schließen">×</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="media" role="tab">Medien</button>
+      <button class="tab" data-tab="qr" role="tab">QR</button>
+      <button class="tab" data-tab="airgap" role="tab">Air-gap</button>
+      <button class="tab" data-tab="system" role="tab">System</button>
+    </div>
+    <div class="panel-body">
+      <section class="tab-page active" data-page="media">
+        <div class="section-title">
+          <span>microSD</span>
+          <span id="sd-meta" class="meta">—</span>
+        </div>
+        <div class="sd-stage" id="sd-stage">
+          <div class="sd-art" id="sd-art">
+            <span class="sd-notch"></span>
+            <span class="sd-label">SPECTER<br><b>8 GB</b></span>
+            <span class="sd-pins"></span>
+          </div>
+          <div class="sd-actions">
+            <button class="btn" id="sd-toggle">Auswerfen</button>
+            <button class="btn ghost" id="sd-import">Dateien…</button>
+            <button class="btn ghost" id="sd-clear">Leeren</button>
+          </div>
+          <p class="hint" id="sd-hint">Karte in den Slot ziehen oder hier auswerfen.</p>
+        </div>
+        <div class="capacity"><span id="sd-bar"></span></div>
+        <ul id="sd-files" class="file-list"><li class="empty">Keine Dateien</li></ul>
+
+        <div class="section-title spaced"><span>MemoryCards</span><span class="meta">3 Slots</span></div>
+        <div class="card-slots" id="card-slots"></div>
+        <p class="hint">Karte anklicken = einsetzen/auswerfen. Rechtsklick = zurücksetzen.</p>
+
+        <div class="section-title spaced"><span>Demo-Inhalt</span><span class="meta">nur Testdaten</span></div>
+        <div class="row">
+          <select id="demo-network" class="select">
+            <option value="">Keine Demo</option>
+            <option value="testnet" selected>Testnet</option>
+            <option value="mainnet">Mainnet</option>
+          </select>
+          <button class="btn" id="demo-load">Laden</button>
+        </div>
+        <p class="hint">Test-Seeds, Wallets, PSBTs und vorbereitete MemoryCards. Niemals echte Seeds.</p>
+      </section>
+
+      <section class="tab-page" data-page="qr">
+        <div class="section-title"><span>QR-Bibliothek</span><span class="meta">3D scanbar</span></div>
+        <div id="qr-library" class="qr-library"></div>
+        <div class="section-title spaced"><span>Eigener QR</span><span class="meta">max. 4 KiB</span></div>
+        <textarea id="qr-custom" class="textarea" rows="4" placeholder="Text, URL, PSBT (base64), bip39: …"></textarea>
+        <div class="row">
+          <button class="btn" id="qr-create">Karte erzeugen</button>
+          <button class="btn ghost" id="qr-send">An Gerät senden</button>
+        </div>
+        <p class="hint">„An Gerät senden“ liefert den QR direkt an den aktiven Specter-Scanner.</p>
+      </section>
+
+      <section class="tab-page" data-page="airgap">
+        <div class="section-title"><span>Air-gapped Workflow</span><span class="meta">QR / SD</span></div>
+        <ol class="steps">
+          <li><b>1</b><span>Demo-Wallets sind vorinstalliert: <em>Default</em> (Single-Sig) und <em>2-of-3 Multisig</em>. Optional per SD neu laden.</span></li>
+          <li><b>2</b><span>Laptop: PSBT-Typ wählen, erzeugen und als QR zeigen.</span></li>
+          <li><b>3</b><span>Specter: <em>Scan QR code</em> öffnen; PSBT-Karte in den Rahmen ziehen.</span></li>
+          <li><b>4</b><span>PSBT prüfen und auf dem Gerät mit <em>Confirm</em> signieren.</span></li>
+          <li><b>5</b><span>Laptop: „Scan device“ liest den signierten QR vom Display.</span></li>
+        </ol>
+        <button class="btn wide" id="airgap-open">Air-gap Konsole öffnen</button>
+        <div class="section-title spaced"><span>USB-Brücke</span><span class="meta">nicht air-gapped</span></div>
+        <div class="row">
+          <input id="usb-url" class="input" value="ws://127.0.0.1:8788" spellcheck="false">
+          <button class="btn ghost" id="usb-connect">Verbinden</button>
+        </div>
+        <p class="hint">Optionaler Virtual-Host-Bridge. Für echte Air-gap-Demos ausgeschaltet lassen.</p>
+      </section>
+
+      <section class="tab-page" data-page="system">
+        <div class="section-title"><span>Firmware</span><span id="fw-version" class="meta">—</span></div>
+        <dl class="kv">
+          <dt>Quelle</dt><dd>cryptoadvance/specter-diy</dd>
+          <dt>Commit</dt><dd id="fw-commit">—</dd>
+          <dt>Runtime</dt><dd>MicroPython · Emscripten WASM</dd>
+          <dt>Display</dt><dd>480 × 800 · LVGL</dd>
+          <dt>Modus</dt><dd id="fw-mode">—</dd>
+        </dl>
+        <div class="row wrap">
+          <button class="btn" id="btn-restart">Neustart</button>
+          <button class="btn ghost" id="btn-factory">Factory Reset</button>
+          <button class="btn ghost" id="btn-power">Power</button>
+        </div>
+        <div class="section-title spaced"><span>Log</span><span class="meta">live</span></div>
+        <pre id="log" class="log"></pre>
+        <p class="disclaimer">Nur Test-Seeds. Kein echter Secure Element, keine echte Air-Gap-Garantie. Dies ist eine Browser-Simulation.</p>
+      </section>
+    </div>
+  </aside>
+
+  <div id="scan-hud" hidden>
+    <div class="scan-frame">
+      <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+      <div class="scan-reticle"><span></span></div>
+      <div class="scan-lens"></div>
+    </div>
+    <div class="scan-copy">
+      <strong>SPECTER SCANNER</strong>
+      <span id="scan-status">QR-Karte in den Rahmen ziehen</span>
+    </div>
+    <div class="scan-actions">
+      <button class="btn ghost" id="scan-cancel">Abbrechen</button>
+      <button class="btn" id="scan-auto">Nächsten QR fokussieren</button>
+    </div>
+    <div class="scan-payload" id="scan-payload" hidden></div>
+  </div>
+
+  <div id="airgap-panel" class="window" hidden aria-hidden="true">
+    <div class="window-head">
+      <div class="traffic"><i></i><i></i><i></i></div>
+      <strong>Specter Desktop — Air-gapped Signing</strong>
+      <button class="close-btn" id="ag-close" aria-label="Schließen">×</button>
+    </div>
+    <div class="window-body">
+      <div class="ag-side">
+        <div class="ag-brand"><img src="assets/specter-logo.png" alt=""><span>Desktop</span></div>
+        <div class="ag-wallet">
+          <small>AKTIVE WALLET</small>
+          <strong>Ghost · Testnet</strong>
+          <span class="badge test">TESTNET</span>
+          <code>wsh(sortedmulti(2,…))</code>
+        </div>
+        <nav class="ag-nav">
+          <button class="active" data-ag-view="wallet">Wallet</button>
+          <button data-ag-view="psbt">PSBT</button>
+          <button data-ag-view="scan">Scan</button>
+          <button data-ag-view="sd">SD-Karte</button>
+        </nav>
+        <div class="ag-status">
+          <span class="dot"></span>
+          <span id="ag-connection">Air-gapped · keine Netzwerkverbindung</span>
+        </div>
+      </div>
+      <div class="ag-main">
+        <section class="ag-view active" data-ag-page="wallet">
+          <div class="ag-hero">
+            <div>
+              <small>BALANCE (SIMULIERT)</small>
+              <strong>0.04210000 BTC</strong>
+              <span>bc1q… Testnet-Demo</span>
+            </div>
+            <div class="ag-orbit"></div>
+          </div>
+          <div class="ag-grid">
+            <div class="ag-card"><small>Wallet</small><strong>Ghost + Zoo + Mirror</strong><span>2-of-3 Multisig</span></div>
+            <div class="ag-card"><small>Gerät</small><strong>Specter DIY</strong><span id="ag-device-state">offline</span></div>
+            <div class="ag-card"><small>Übertragung</small><strong>QR / microSD</strong><span>kein USB, kein Netz</span></div>
+          </div>
+          <div class="row" style="margin-bottom:10px">
+            <select id="ag-kind" class="select">
+              <option value="low">Single-Sig / Low fee</option>
+              <option value="high">Single-Sig / High fee</option>
+              <option value="multisig">2-of-3 Multisig</option>
+            </select>
+          </div>
+          <button class="btn wide" id="ag-create">PSBT erzeugen</button>
+        </section>
+        <section class="ag-view" data-ag-page="psbt">
+          <div class="ag-psbt">
+            <div class="ag-psbt-head"><strong id="ag-psbt-title">Testnet Ghost → Zoo</strong><span class="badge test">UNSIGNED</span></div>
+            <dl class="kv">
+              <dt>Betrag</dt><dd id="ag-amount">0.00150000 BTC</dd>
+              <dt>Gebühr</dt><dd id="ag-fee">142 sats</dd>
+              <dt>Empfänger</dt><dd id="ag-recipient">tb1q…</dd>
+              <dt>PSBT</dt><dd id="ag-psbt-id">—</dd>
+            </dl>
+            <div class="ag-qr" id="ag-qr"><canvas></canvas><span class="ag-qr-hint">QR am Laptop</span></div>
+            <div class="row wrap">
+              <button class="btn" id="ag-show-qr">QR zeigen</button>
+              <button class="btn ghost" id="ag-write-sd">Auf SD schreiben</button>
+              <button class="btn ghost" id="ag-scan-device">Scan device</button>
+            </div>
+          </div>
+        </section>
+        <section class="ag-view" data-ag-page="scan">
+          <div class="ag-scan">
+            <div class="ag-cam"><canvas id="ag-cam-canvas"></canvas><div class="ag-cam-frame"></div><span>device display</span></div>
+            <div class="ag-scan-copy">
+              <strong>Signierten QR vom Gerät lesen</strong>
+              <p>Das virtuelle Laptop-Webcam liest das Specter-Display. Halte den signierten PSBT-QR sichtbar.</p>
+              <button class="btn" id="ag-scan-run">Jetzt scannen</button>
+              <div class="ag-result" id="ag-scan-result">Noch keine Signatur gelesen.</div>
+            </div>
+          </div>
+        </section>
+        <section class="ag-view" data-ag-page="sd">
+          <div class="ag-sd">
+            <strong>microSD-Austausch</strong>
+            <p>PSBT auf die simulierte Karte schreiben, Karte in Specter einsetzen, dort signieren und die signierte Datei zurücklesen.</p>
+            <div class="row wrap">
+              <button class="btn" id="ag-sd-write">PSBT → SD</button>
+              <button class="btn ghost" id="ag-sd-read">SD lesen</button>
+              <button class="btn ghost" id="ag-sd-eject">Karte auswerfen</button>
+            </div>
+            <pre id="ag-sd-log" class="log"></pre>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="keeper-panel" class="keeper-window" hidden aria-hidden="true">
+    <div class="keeper-shell">
+      <div class="keeper-notch"></div>
+      <canvas id="keeper-canvas" width="360" height="720"></canvas>
+      <button class="close-btn keeper-close" id="keeper-close" aria-label="Schließen">×</button>
+    </div>
+    <div class="keeper-info">
+      <div class="ag-brand"><span class="keeper-dot"></span><span>Bitcoin Keeper</span></div>
+      <p class="keeper-tag">Selbstverwahrung · Testnet</p>
+      <div class="keeper-facts">
+        <div><small>WALLET</small><strong>Ghost Vault</strong></div>
+        <div><small>GERÄT</small><strong>Specter DIY 3D</strong></div>
+        <div><small>TRANSFER</small><strong>QR / SD</strong></div>
+      </div>
+      <p class="hint">Keeper erzeugt PSBTs und liest den signierten QR vom Specter-Display. Nur Testdaten.</p>
+      <button class="btn wide" id="keeper-reset">Session zurücksetzen</button>
+    </div>
+  </div>
+
+  <div id="onboarding" class="onboarding">
+    <div class="ob-card">
+      <div class="ob-brand"><img src="assets/specter-logo.png" alt=""><span>DIY 3D LAB</span></div>
+      <h1>Dein Specter. In 3D. In deiner Hand.</h1>
+      <p>Die echte Specter-DIY-Firmware läuft als WebAssembly. Du hältst das Gerät, drückst den Power-Knopf, schiebst microSD und Smartcard ein und scannst QR-Codes in der Szene.</p>
+      <div class="ob-grid">
+        <div><b>01</b><span>Power-Knopf klicken</span></div>
+        <div><b>02</b><span>PIN <code>1234</code> tippen</span></div>
+        <div><b>03</b><span>SD / Smartcard bewegen</span></div>
+        <div><b>04</b><span>QR im Scanner anvisieren</span></div>
+      </div>
+      <div class="ob-warn">Nur Test-Seeds. Kein echtes Geld. Keine echte Hardware-Sicherheit.</div>
+      <button class="btn wide" id="ob-start">Workbench starten</button>
+      <button class="link-btn" id="ob-help">Mehr erfahren</button>
+    </div>
+  </div>
+
+  <div id="help" class="help-overlay" hidden>
+    <div class="help-card">
+      <div class="panel-head"><strong>So funktioniert das 3D-Lab</strong><button class="close-btn" id="help-close">×</button></div>
+      <div class="help-body">
+        <h3>Gerät</h3>
+        <p>Power-Knopf an der Oberseite klicken. Das echte Specter-Firmware-Image bootet im Worker. Touchscreen mit Maus/Finger bedienen. Im Hand-Modus das Gerät ziehen, um es zu drehen; im Desk-Modus auf dem Ständer.</p>
+        <h3>Medien</h3>
+        <p>microSD links, Smartcard rechts. Karten aus dem Tray ziehen und in den Slot fallen lassen, oder im Workbench-Panel einsetzen/auswerfen. Die Firmware sieht nur den simulierten Transport.</p>
+        <h3>QR-Scanner</h3>
+        <p>Sobald Specter den Scanner öffnet, wechselt die Szene in die Kamera-POV. QR-Karten und Smartphones in den Rahmen ziehen. jsQR liest den gerenderten Frame und liefert die Bytes an die Firmware.</p>
+        <h3>Air-gapped</h3>
+        <p>Der Laptop erzeugt PSBTs, zeigt sie als QR oder schreibt sie auf SD. Das Gerät signiert offline. Danach liest der Laptop den signierten QR vom Display. Kein USB, kein Netzwerk.</p>
+        <h3>Grenzen</h3>
+        <p>Dies ist eine Browser-Simulation. Kein Secure Element, keine echte Air-Gap-Garantie, keine echte Hardware. Nur Test-Seeds und Testnet verwenden.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tooltip" hidden></div>
+  <div id="boot-veil"><div class="boot-mark"><img src="assets/specter-logo.png" alt=""><span>BOOT</span></div></div>
+  <input type="file" id="file-input" multiple hidden>
+
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="vendor/jsQR.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/"
+    }
+  }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
+
